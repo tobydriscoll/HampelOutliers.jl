@@ -2,8 +2,9 @@ module HampelOutliers
 
 const Hampel = HampelOutliers
 export Hampel
-import Base: filter, filter!
-using StatsBase: mad, median
+# import Base: filter, filter!
+using Statistics: median
+using StatsBase: mad
 
 # default function to measure spread of data
 # becomes stadard deviation for normally distributed data
