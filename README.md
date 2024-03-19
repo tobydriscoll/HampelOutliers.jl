@@ -1,8 +1,10 @@
 # HampelOutliers.jl
 
-This package provides a basic Julia implementation of the Hampel filter[^1], which is a robust method for detecting and replacing outliers in a univariate time series. Compared to convolutional filters, the Hampel filter is less likely to smooth edges and better at removing isolated spikes without affecting the rest of the data.
+This package provides a basic Julia implementation of the Hampel filter[^1], which is a robust method for detecting and replacing outliers in a univariate time series. Compared to convolutional filters, the Hampel filter is less likely to smooth edges and better at removing isolated spikes without affecting the rest of the data. But it is tunably less aggressive than a standard median filter.
 
 [^1]: J Astola, P Kuosmanen, Fundamentals of nonlinear digital filtering (CRC Press, Boca Raton, FL, USA, 1997)
+
+![](demo_comparison.svg)
 
 Given the values $x_1, x_2,\dots,$ the Hampel filter replaces elements $x_k$ such that
 
@@ -12,7 +14,7 @@ where $m$ is the median of the elements, $t$ is a positive parameter (often set 
 
 By default, the spread $S$ is the median absolute deviation (MAD) of the data, normalized by about 1.48 so that it becomes an unbiased estimator of the standard deviation for normally distributed values.
 
-For $t=0$, the Hampel filter is equivalent to the standard median filter. As $t$ increases, the Hampel filter becomes more tolerant of outliers or less "aggressive" about making replacements. For example:
+For $t=0$, the Hampel filter is equivalent to the median filter. As $t$ increases, the Hampel filter becomes more tolerant of outliers. For example:
 
 ```julia-repl
 julia> using HampelOutliers, Statistics, StatsBase
@@ -35,6 +37,7 @@ If we change the threshold to $t=3$, however, the outlier is accepted:
 julia> findall( Hampel.identify(x, threshold=3) )
 Int64[]
 ```
+
 ## Windowing and weighting
 
 In the context of a time series, the Hampel filter criterion and replacement is usually applied in a moving window fashion. For this package, the window length is always odd, and you specify the half-width. For example, 
