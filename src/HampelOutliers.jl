@@ -50,10 +50,9 @@ function identify!(y::AbstractVector, x::AbstractVector; spread=mad_spread, thre
 end
 
 """
-    Hampel.filter(x, K; spread=mad, threshold=2)
-    Hampel.filter(x, weights; ...)
+    Hampel.filter(x, K; spread=mad, threshold=2, boundary=:truncate)
 
-Apply a weighted Hampel filter to a time series.
+Apply a windowed Hampel filter to a time series.
 
 Given vector `x` and half-width `K`, apply a Hampel criterion within a
 sliding window of width 2K+1. The median ``m`` of the window replaces the element
@@ -69,6 +68,16 @@ to avoid referencing fictitious elements. Larger values of ``t`` make the filter
 while ``t=0`` is the standard median filter.
 
 For recursive filtering, see `filter!`
+
+The value of `boundary` determines how the filter handles the boundaries of the vector:
+
+- `:truncate` (default): the window is shortened at the boundaries
+- `:reflect`: values are reflected across the boundaries
+- `:repeat`: end values are repeated as necessary
+
+    Hampel.filter(x, weights; ...)
+
+Apply a weighted Hampel filter to a time series.
 
 Given vector `x` and a vector `weights` of positive intgers, before computing the criterion
 each element in the window is repeated by the number of times given by its corresponding
@@ -88,29 +97,60 @@ end
 
 Apply a weighted Hampel filter in-place.
 
-The idiom `Hampel.filter!(x,x,...)` will make the filter recursive, i.e., vector elements are
+The idiom `Hampel.filter!(x, x,...)` will make the filter recursive, i.e., vector elements are
 replaced as they are found, possibly affecting future results.
 """
 function filter!(y::AbstractVector, x::AbstractVector, K::Integer; kwargs...)
     return filter!(y, x, fill(1,2K+1); kwargs...)
 end
 
-function filter!(y::AbstractVector, x::AbstractVector, weights::Vector{<:Integer};
-                       spread=mad_spread, threshold=2)
+function filter!(
+    y::AbstractVector,
+    x::AbstractVector,
+    weights::Vector{<:Integer};
+    spread=mad_spread,
+    threshold=2,
+    boundary=:truncate
+    )
     KK1 = length(weights)
     @assert isodd(KK1) "Must specify an odd number of weights"
     K = (KK1 - 1) ÷ 2  # filter half-width
+
+    x_idx = collect(eachindex(x))
+    y_idx = collect(eachindex(y))
     N = length(x)
+
     # Set up duplications as specified by the weights.
     idx = vcat( [fill(i, m) for (i, m) in zip(-K:K, weights)]... )
-    for n in 1:N
+    inbnds = falses(length(idx))
+
+    function valid(idx)
+        map!(i -> 1 <= i <= N, inbnds, idx)
+        # avoid allocating unless needed for boundary condition
+        if all(inbnds)
+            return idx
+        elseif boundary == :truncate
+            return view(idx, inbnds)
+        elseif boundary == :reflect
+            v = copy(idx)
+            v[v .< 1] .= 2 .- v[v .< 1]
+            v[v .> N] .= 2N .- v[v .> N]
+            return v
+        elseif boundary == :repeat
+            return map(i -> max(1, min(i, N)), idx)
+        else
+            throw(ArgumentError("Invalid boundary condition"))
+        end
+    end
+
+    for (nx, ny) in zip(x_idx, y_idx)
         @. idx += 1
-        valid = @. 1 <= idx <= N
-        window = view(x, idx[valid])
-        wmed = median(window)
+        v = valid(idx)
+        window = view(x, x_idx[v])
+        win_med = median(window)
         S = spread(window)
-        out = abs(x[n] - wmed) > threshold*S
-        y[n] =  out ? wmed : x[n]
+        out = abs(x[nx] - win_med) > threshold*S
+        y[ny] =  out ? win_med : x[nx]
     end
     return y
 end
