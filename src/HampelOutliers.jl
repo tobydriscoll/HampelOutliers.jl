@@ -40,7 +40,7 @@ In-place version of `Hampel.identify`.
 # See also
 [`Hampel.identify`](@ref)
 """
-function identify!(y::AbstractVector, x::AbstractVector; spread=mad_spread, threshold=3)
+function identify!(y::AbstractVector, x::AbstractVector; spread=mad_spread, threshold=2)
     S = spread(x)
     m = median(x)
     for k in eachindex(x)
